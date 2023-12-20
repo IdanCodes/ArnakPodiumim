@@ -12,6 +12,7 @@ const arnakOutputPath = "arnak.txt";
 TODO: Implement this later to get more statistics
     let eventsPodiums = {};      // { event: [EVENT_NAME], podiums: { first: [COMP], second: [COMP], third: [COMP] } }
 */
+let weekNumber;
 let competitors = [];
 
 run();
@@ -19,13 +20,13 @@ run();
 
 function run() {
     // load events array from results file
-    loadCompetitors();
+    loadResults();
     sortCompetitors();
     fs.writeFileSync(arnakOutputPath, getOutput());
 }
 
 
-function loadCompetitors() {
+function loadResults() {
     const EV_NAME_WRAPPER = "**";
 
     // load events array from results file
@@ -36,6 +37,11 @@ function loadCompetitors() {
         if (event.length == 0)
             continue;
 
+        if (event[0] == '&') { // week number
+            weekNumber = event.substring(1);
+            continue;
+        }
+
         let lines = event.split('\n');
         let eventName = lines[0].split(EV_NAME_WRAPPER)[1];
 
@@ -44,7 +50,6 @@ function loadCompetitors() {
             continue;
         }
 
-        // console.log("event: " + event);
         updateCompetitor(getCompName(lines[1]), PLACE_NAME.first, eventName); // there's always a first place
     
         if (lines.length > 2) { // if there was a second place
@@ -109,7 +114,7 @@ function sortCompetitors() {
 
 function getOutput() {
     // [NAME] ([FIRST_PLACES] = [NUM_FIRST_PLACES], [SECOND_PLACES] = [NUM_SECOND_PLACES], [THIRD_PLACES] = [NUM_THIRD_PLACES])
-    let output = "";
+    let output = "TAHASH WEEK " + weekNumber + ":\n";
 
     competitors.forEach(comp => {
         let thirdStr = "0";
