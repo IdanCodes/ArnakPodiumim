@@ -1,135 +1,136 @@
+// imports
+const { CompetitorData: CompetitorData,
+        PLACE_NAME: PLACE_NAME } = require('./competitorData');
 const fs = require('fs');
+
+// constants
 const resultsSourcePath = "results.json";
 const arnakOutputPath = "arnak.txt";
-let arnak = [];      /* [ { name: "Guy Taragano", podiums: 25 } ] */
+
+// variables
+/*
+TODO: Implement this later to get more statistics
+    let eventsPodiums = {};      // { event: [EVENT_NAME], podiums: { first: [COMP], second: [COMP], third: [COMP] } }
+*/
+let competitors = [];
+
+run();
 
 
-generateArnak();
-sortArnak();
-saveArnak();
-
-
-
-/*  ----  FUNCTIONS    ----  */
-
-
-/* generates an (unsorted) arnak from the results json file */
-function generateArnak() {
-    // Load results from file
-    const results = JSON.parse(fs.readFileSync(resultsSourcePath, 'utf8'));
-
-    // First line in every 'result' is the event name
-    for (const result of results) {
-        const lines = result.split('\n');
-        if (lines.length == 0)      // 0 lines?     (Probably won't happen)
-            console.log("INVALID EVENT - EMPTY");
-        else
-            handleEvent(lines);
-    }
+function run() {
+    // load events array from results file
+    loadCompetitors();
+    sortCompetitors();
+    fs.writeFileSync(arnakOutputPath, getOutput());
 }
 
 
-/* handles the event given the results.
-    Given results are seperated by '\n', and the first line is the event name. */
-function handleEvent(results) {
-    let max = (results.length > 4) ? 3 : results.length - 1;
-    for (let i = 1; i <= max; i++) {
-        let colonIndex = results[i].indexOf(':');
-        const name = results[i].substring(3, colonIndex);
-        incrementCompetitor(name);
-    }
+function loadCompetitors() {
+    const EV_NAME_WRAPPER = "**";
 
-    /*
-    -- MAY BE USED LATER FOR OTHER STATS --
-    if (results.length >= 4) {          // At least 3 places
+    // load events array from results file
+    const events = JSON.parse(fs.readFileSync(resultsSourcePath, 'utf8'));
 
-    }
-    if (results.length >= 3) {          // At least 2 places
+    for (let i = 0; i < events.length; i++) {
+        let event = events[i];
+        if (event.length == 0)
+            continue;
 
-    }
-    if (results.length >= 2) {          // At least 1 person competed
+        let lines = event.split('\n');
+        let eventName = lines[0].split(EV_NAME_WRAPPER)[1];
 
-    }
-    else {                              // Nobody competed
-        
-    }
-    */
-}
+        if (eventName == "") {
+            console.log("Warning (loadEvents): Found empty event name, ignoring.");
+            continue;
+        }
 
+        // console.log("event: " + event);
+        updateCompetitor(getCompName(lines[1]), PLACE_NAME.first, eventName); // there's always a first place
+    
+        if (lines.length > 2) { // if there was a second place
+            updateCompetitor(getCompName(lines[2]), PLACE_NAME.second, eventName);
 
-/* sort the arnak by number of podiums (bubble sort).
-    On the arnak, sort competitors with the same number of podiums by alphabetical order. */
-function sortArnak() {
-    // arnak.sort((a, b) => b.podiums - a.podiums);
-    arnak.sort((a, b) => {
-        if (a.podiums != b.podiums)
-            return b.podiums - a.podiums; // keep original order
-
-        // sort by name
-        const nameA = a.name.toUpperCase();     // ignore upper and lowercase
-        const nameB = b.name.toUpperCase();     // ignore upper and lowercase
-
-        if (nameA < nameB)
-            return -1;
-        else
-            return 1;
-    });
-}
-
-
-/* increments the number of podiums for a competitor given their name */
-function incrementCompetitor(competitorName) {
-    for (let i in arnak) {
-        if (arnak[i].name == competitorName) {
-            arnak[i].podiums++;
-            return;
+            if (lines.length > 3) // if there was a third place
+                updateCompetitor(getCompName(lines[3]), PLACE_NAME.third, eventName);
         }
     }
 
-    // The competitor does not yet have data in the arnak
-    arnak.push({ name: competitorName, podiums: 1 });
+    function getCompName(line) {
+        const spaceSplit = line.split(" ");
+
+        let compName = "";
+        let i = 1;
+
+        do {
+            compName += spaceSplit[i++] + " ";
+        }
+        while (compName[compName.length - 2] != ':');
+
+        return compName.substring(0, compName.length - 2);
+    }
 }
 
 
-/* trim asterisks (*) from the start and end of the string (returns the output) */
-/*
-USED TO REMOVE ASTERISKS SURROUNDING EVENT NAMES - MAY BE USED IN THE FUTURE
-function trimAst(str) {
-    if (str.length == 0)
-        return str;
-
-    let start = 0;
-    while (str[start] == '*')
-        start++;
-
-    let end = str.length - 1;
-    while (str[end] == '*')
-        end--;
-
-    return str.substring(start, end + 1);
-}
-*/
-
-
-/* save the arnak into the output file */
-function saveArnak() {
-    let output = "";
-    for (const data of arnak)
-        output += `${data.name}: ${data.podiums}\n`;
+// increments the competitor's [place] podium by 1
+function updateCompetitor(name, place, event) {
+    for (let i = 0; i < competitors.length; i++) {
+        const competitor = competitors[i];
+        if (competitor.name == name) {
+            competitor.incrementPodium(place, event);
+            return;
+        }
+    }
     
-    fs.writeFileSync(arnakOutputPath, output);
+    // competitor doesn't have a podium yet
+    competitors.push(new CompetitorData(name));
+    updateCompetitor(name, place, event);
 }
 
+function sortCompetitors() {
+    competitors.sort((a, b) => {
+        if (a.numFirstPlaces !== b.numFirstPlaces)
+            return b.numFirstPlaces - a.numFirstPlaces;
 
-/*
-Ideas:
-    * number of people competed in each event
-    * people who got the most last (3) places
-    * the event competed in the most
-    * the event competed in the least
+        if (a.numSecondPlaces !== b.numSecondPlaces)
+            return b.numSecondPlaces - a.numSecondPlaces;
 
-*/
+        if (a.numThirdPlaces !== b.numThirdPlaces)
+            return b.numThirdPlaces - a.numThirdPlaces;
 
-/*
-    TODO: Include JDOC documentation
-*/
+        if (a.numPodiums !== b.numPodiums)
+            return b.numPodiums - a.numPodiums;
+        
+        // sort by name
+        const nameA = a.name.toUpperCase();     // ignore upper and lowercase
+        const nameB = b.name.toUpperCase();     // ignore upper and lowercase
+        return (nameA < nameB) ? -1 : 1;
+    });
+}
+
+function getOutput() {
+    // [NAME] ([FIRST_PLACES] = [NUM_FIRST_PLACES], [SECOND_PLACES] = [NUM_SECOND_PLACES], [THIRD_PLACES] = [NUM_THIRD_PLACES])
+    let output = "";
+
+    competitors.forEach(comp => {
+        let thirdStr = "0";
+        if (comp.numThirdPlaces > 0)
+            thirdStr = `[${comp.thirdPlaces.join(", ")}] = ${comp.numThirdPlaces}`;
+
+        let secondStr = "0";
+        if (comp.numSecondPlaces > 0)
+            secondStr = `[${comp.secondPlaces.join(", ")}] = ${comp.numSecondPlaces}`;
+        if (thirdStr != "")
+                secondStr += ",\t";
+
+        let firstStr = "0";
+        if (comp.numFirstPlaces > 0)
+            firstStr = `[${comp.firstPlaces.join(", ")}] = ${comp.numFirstPlaces}`;
+        if (secondStr != "")
+                firstStr += ",\t";
+            
+
+        output += `${comp.name} (${firstStr}${secondStr}${thirdStr}) = ${comp.numPodiums}\n`;
+    });
+
+    return output;
+}

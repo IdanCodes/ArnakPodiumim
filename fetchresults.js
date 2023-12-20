@@ -4,9 +4,11 @@ const RESULTS_ID = "comp-kvwl551f3";
 const TAHASH_RESULTS_URL = "https://tuvistone.wixsite.com/website/%D7%AA%D7%95%D7%A6%D7%90%D7%95%D7%AA/";
 const SCORES_FILE_PATH = "results.json";
 
+// TODO: Also fetch week number
+
 (async () => {
     // Launch the browser and open a new blank page
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
 
     // Navigate the page to a URL
